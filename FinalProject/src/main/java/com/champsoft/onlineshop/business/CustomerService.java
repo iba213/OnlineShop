@@ -2,8 +2,11 @@ package com.champsoft.onlineshop.business;
 
 import com.champsoft.onlineshop.dataccess.entity.Customer;
 import com.champsoft.onlineshop.dataccess.repository.CustomerRepository;
+import com.champsoft.onlineshop.presentation.dto.customer.CustomerRequest;
+import com.champsoft.onlineshop.presentation.dto.customer.CustomerResponse;
 import com.champsoft.onlineshop.utilities.CustomerNotFoundException;
 import com.champsoft.onlineshop.utilities.DuplicateResourceException;
+import com.champsoft.onlineshop.presentation.mapper.CustomerMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,39 +23,46 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public List<Customer> getAll() {
-        return customerRepository.findAll();
+    public List<CustomerResponse> getAll() {
+        return customerRepository.findAll().stream()
+                .map(CustomerMapper::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public Customer getById(Long id) {
-        return customerRepository.findById(id)
+    public CustomerResponse getById(Long id) {
+        Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new CustomerNotFoundException(id));
+        return CustomerMapper.toResponse(customer);
     }
 
     @Transactional
-    public Customer create(Customer customer) {
-        if (customerRepository.existsByEmailIgnoreCase(customer.getEmail())) {
-            throw new DuplicateResourceException("Customer email already exists: " + customer.getEmail());
+    public CustomerResponse create(CustomerRequest dto) {
+        if (customerRepository.existsByEmailIgnoreCase(dto.email())) {
+            throw new DuplicateResourceException("Email already exists: " + dto.email());
         }
-        return customerRepository.save(customer);
+
+        Customer entity = CustomerMapper.toEntity(dto);
+        Customer saved = customerRepository.save(entity);
+        return CustomerMapper.toResponse(saved);
     }
 
     @Transactional
-    public Customer update(Long id, Customer updatedCustomer) {
+    public CustomerResponse update(Long id, CustomerRequest dto) {
         Customer existing = customerRepository.findById(id)
                 .orElseThrow(() -> new CustomerNotFoundException(id));
 
-        boolean emailChanged = !existing.getEmail().equalsIgnoreCase(updatedCustomer.getEmail());
-        if (emailChanged && customerRepository.existsByEmailIgnoreCase(updatedCustomer.getEmail())) {
-            throw new DuplicateResourceException("Customer email already exists: " + updatedCustomer.getEmail());
+        boolean emailChanged = !existing.getEmail().equalsIgnoreCase(dto.email());
+        if (emailChanged && customerRepository.existsByEmailIgnoreCase(dto.email())) {
+            throw new DuplicateResourceException("Email already exists: " + dto.email());
         }
 
-        existing.setName(updatedCustomer.getName());
-        existing.setEmail(updatedCustomer.getEmail());
-        existing.setAddress(updatedCustomer.getAddress());
+        existing.setName(dto.name());
+        existing.setEmail(dto.email());
+        existing.setAddress(dto.address());
 
-        return customerRepository.save(existing);
+        Customer updated = customerRepository.save(existing);
+        return CustomerMapper.toResponse(updated);
     }
 
     @Transactional
@@ -61,26 +71,24 @@ public class CustomerService {
                 .orElseThrow(() -> new CustomerNotFoundException(id));
 
         if (existing.getOrders() != null && !existing.getOrders().isEmpty()) {
-            throw new IllegalStateException("Cannot delete customer with existing orders.");
+            throw new IllegalStateException("Cannot delete customer with active orders.");
         }
 
         customerRepository.delete(existing);
     }
 
     @Transactional(readOnly = true)
-    public List<Customer> search(String namePart, String emailPart, Instant minCreated, Instant maxCreated) {
-        String nameNorm = normalize(namePart);
-        String emailNorm = normalize(emailPart);
-        return customerRepository.searchAll(nameNorm, emailNorm, minCreated, maxCreated);
+    public List<CustomerResponse> search(String namePart, String emailPart,
+                                            Instant minCreated, Instant maxCreated) {
+        return customerRepository.searchAll(namePart, emailPart, minCreated, maxCreated)
+                .stream()
+                .map(CustomerMapper::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public Customer getEntityById(Long id) {
         return customerRepository.findById(id)
                 .orElseThrow(() -> new CustomerNotFoundException(id));
-    }
-
-    private static String normalize(String value) {
-        return (value == null || value.isBlank()) ? null : value.trim();
     }
 }

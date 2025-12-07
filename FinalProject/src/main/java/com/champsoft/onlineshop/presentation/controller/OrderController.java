@@ -1,7 +1,9 @@
 package com.champsoft.onlineshop.presentation.controller;
 
 import com.champsoft.onlineshop.business.OrderService;
-import com.champsoft.onlineshop.dataccess.entity.Order;
+import com.champsoft.onlineshop.presentation.dto.order.OrderRequest;
+import com.champsoft.onlineshop.presentation.dto.order.OrderResponse;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -22,28 +24,22 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders() {
-        List<Order> orders = orderService.getAll();
-        if (orders.isEmpty()) {
-            return ResponseEntity.noContent().build();
-        }
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        List<OrderResponse> orders = orderService.getAll();
+        if (orders.isEmpty()) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(orders);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-        Order order = orderService.getById(id);
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
+        OrderResponse order = orderService.getById(id);
         return ResponseEntity.ok(order);
     }
 
     @PostMapping
-    public ResponseEntity<Order> createOrder(
-            @RequestParam Long customerId,
-            @RequestParam List<Long> productIds) {
-
-        Order saved = orderService.create(customerId, productIds);
-        return ResponseEntity.created(URI.create("/api/orders/" + saved.getId()))
-                .body(saved);
+    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest dto) {
+        OrderResponse saved = orderService.create(dto);
+        return ResponseEntity.created(URI.create("/api/orders/" + saved.id())).body(saved);
     }
 
     @DeleteMapping("/{id}")
@@ -52,17 +48,14 @@ public class OrderController {
         return ResponseEntity.ok("Order " + id + " deleted successfully.");
     }
 
-
     @GetMapping("/search")
-    public ResponseEntity<List<Order>> searchOrders(
+    public ResponseEntity<List<OrderResponse>> searchOrders(
             @RequestParam(required = false) Long customerId,
             @RequestParam(required = false) Instant minCreated,
             @RequestParam(required = false) Instant maxCreated) {
 
-        List<Order> results = orderService.search(customerId, minCreated, maxCreated);
-        if (results.isEmpty()) {
-            return ResponseEntity.noContent().build();
-        }
+        List<OrderResponse> results = orderService.search(customerId, minCreated, maxCreated);
+        if (results.isEmpty()) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(results);
     }
 }
